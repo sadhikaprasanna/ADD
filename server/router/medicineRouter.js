@@ -3,116 +3,108 @@ const router = express.Router();
 const Prescription = require('../model/prescriptionModel');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
-const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
-//const path=require('path');
+const { Resend } = require('resend');
 require("dotenv").config();
 
-const generateGroupId = () => {
-  return uuidv4();
-};
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Configure nodemailer transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Generate unique Group ID
+const generateGroupId = () => uuidv4();
 
 router.post('/add-all-details', async (req, res) => {
   try {
+    console.log("Prescription API hit");
+
     const { name, email, symptoms: rawSymptoms, medicines, groupId } = req.body;
 
-    if (!name || !email || !rawSymptoms || !medicines || !Array.isArray(medicines) || medicines.length === 0) {
-      return res.status(400).json({ error: 'Invalid request. Please provide all required details, including an array of medicines.' });
+    if (!name || !email || !rawSymptoms || !Array.isArray(medicines) || medicines.length === 0) {
+      return res.status(400).json({ error: 'Invalid request.' });
     }
 
     const newGroupId = groupId || generateGroupId();
-    const symptoms = rawSymptoms.split(',').map(symptom => symptom.trim());
+    const symptoms = rawSymptoms.split(',').map(s => s.trim());
 
-    const isValidQuantity = medicines.every(med => /^\d+$/.test(med.quantity));
-
-    if (!isValidQuantity) {
-      return res.status(400).json({ error: 'Invalid request. Medicine quantity must be a numeric value.' });
+    if (!medicines.every(med => /^\d+$/.test(med.quantity))) {
+      return res.status(400).json({ error: 'Medicine quantity must be numeric.' });
     }
 
-    const qrCodeData = JSON.stringify(medicines.map(med => ({ medicine: med.medicine, quantity: med.quantity })));
-    const qrCodeDataUrl = await QRCode.toDataURL(qrCodeData);
+    // QR code
+    const qrData = JSON.stringify(medicines);
+    const qrDataUrl = await QRCode.toDataURL(qrData);
+    const qrBuffer = Buffer.from(qrDataUrl.split(",")[1], "base64");
 
-    // Split the data URL into its parts
-    const qrCodeParts = qrCodeDataUrl.split(',');
+    console.log("3. QR Generated");
 
-    if (qrCodeParts.length !== 2) {
-      return res.status(500).json({ error: 'Failed to generate QR code.' });
-    }
-
-    const qrCodeBuffer = Buffer.from(qrCodeParts[1], 'base64');
-
-    const allDetails = {
+    // Save to database
+    const savedDetails = await Prescription.create({
       patientDetails: { name, email, symptoms, groupId: newGroupId },
-      medicines: medicines.map(med => ({ medicine: med.medicine, quantity: med.quantity })),
-      qrCode: qrCodeBuffer,
-    };
+      medicines,
+      qrCode: qrBuffer
+    });
 
-    const savedDetails = await Prescription.create(allDetails);
+    // PDF Path (Render-safe temp dir)
+    const pdfPath = `/tmp/prescription_${newGroupId}.pdf`;
 
-    // Logo file path (replace 'path/to/your/logo.png' with the actual path to your logo image)
-    //const logoPath = path.join(__dirname, 'routerlogo.jpg');
-
-    // Create a PDF with patient details, logo, and QR code
-    const pdfFileName = `prescription_${newGroupId}.pdf`;
-    const pdfStream = fs.createWriteStream(pdfFileName);
     const pdfDoc = new PDFDocument();
+    const pdfStream = fs.createWriteStream(pdfPath);
 
     pdfDoc.pipe(pdfStream);
 
-    // Embed logo into the PDF
-    //pdfDoc.image(logoPath, { width: 100, height: 100, align: 'left' }).moveDown();
-
-    pdfDoc.text('Prescription Details', { align: 'center', underline: true }).moveDown();
+    pdfDoc.fontSize(20).text('Prescription Details', { align: 'center', underline: true }).moveDown();
+    pdfDoc.fontSize(14);
     pdfDoc.text(`Patient Name: ${name}`).moveDown();
     pdfDoc.text(`Email: ${email}`).moveDown();
     pdfDoc.text(`Symptoms: ${symptoms.join(', ')}`).moveDown();
     pdfDoc.text(`Group ID: ${newGroupId}`).moveDown();
     pdfDoc.text('Medicines:').moveDown();
-    medicines.forEach(med => pdfDoc.text(`${med.medicine}: ${med.quantity}`).moveDown());
+    medicines.forEach(m => pdfDoc.text(`${m.medicine}: ${m.quantity}`).moveDown());
 
-    // Embed QR code image into the PDF
-    pdfDoc.image(qrCodeBuffer, { fit: [250, 250], align: 'center', valign: 'center' }).moveDown();
+    pdfDoc.image(qrBuffer, { fit: [180, 180], align: 'center' }).moveDown();
 
     pdfDoc.end();
+    console.log("4. PDF writing started");
 
-    // Send email with PDF attachment
-    await transporter.sendMail({
-      from: {
-        name: "ADD",
-        address: process.env.EMAIL_USER
-      },
-      to: email,
-      subject: 'Your Prescription Details',
-      text: 'Please find your prescription details attached.',
-      attachments: [
-        {
-          filename: pdfFileName,
-          path: pdfFileName,
-        },
-      ],
+    pdfStream.on("finish", async () => {
+      console.log("5. PDF finished — sending email with Resend...");
+
+      try {
+        const attachmentFile = fs.readFileSync(pdfPath);
+
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM,
+          to: email,
+          subject: "Your Prescription Details",
+          text: "Please find your prescription PDF attached.",
+          attachments: [
+            {
+              filename: `prescription_${newGroupId}.pdf`,
+              content: attachmentFile.toString("base64"),
+              contentType: "application/pdf"
+            }
+          ]
+        });
+
+        console.log("Email sent successfully via Resend");
+
+        fs.unlinkSync(pdfPath); // cleanup
+
+        return res.status(201).json({
+          message: "Prescription saved and email sent successfully via Resend.",
+          details: savedDetails,
+          groupId: newGroupId,
+        });
+
+      } catch (emailErr) {
+        console.error("Email error:", emailErr);
+        return res.status(500).json({ error: "Failed to send email using Resend." });
+      }
     });
 
-    // Delete the generated PDF file
-    fs.unlinkSync(pdfFileName);
-
-    res.status(201).json({
-      message: 'Patient details and medicines saved successfully. PDF and QR code sent to email.',
-      details: savedDetails,
-      groupId: newGroupId,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+  } catch (err) {
+    console.error("Route error:", err);
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 

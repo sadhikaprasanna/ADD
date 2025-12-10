@@ -5,7 +5,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faEnvelope, faStethoscope, faPills,faSortAmountUp } from '@fortawesome/free-solid-svg-icons';
 
 import './newprescription.css';  // Import the CSS file
-
 const NewPrescription = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -17,38 +16,30 @@ const NewPrescription = () => {
   const [setQRCodeImage] = useState(null);
 
   const handleSavePrescription = async () => {
-    try {
-      // Ensure there are patient details and medicines
-      if (!name.trim() || !email.trim() || !symptoms.trim() || prescriptionDetails.length === 0) {
-        alert('Please provide all details, including at least one medicine, before saving.');
-        return;
-      }
+    console.log("Calling API:", `${process.env.REACT_APP_API_URL}/medicine/add-all-details`);
 
-      // Save patient and medicine details
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/medicine/add-all-details`, {
-        name,
-        email,
-        symptoms,
-        newQuantity,
-        medicines: prescriptionDetails.map(({ medicine, quantity }) => ({ medicine, quantity })),
-      });
-
-      // Check if response and response.data are defined
-      if (response && response.data) {
-        alert('Prescription details saved successfully');
-
-        // Set the QR Code data for immediate display
-        //setQRCodeData(response.data.qrCode);
-
-        // Generate QR code image and update the state
-        generateQRCodeImage(response.data.qrCode);
-      } else {
-        console.error('Invalid response from the server:', response);
-      }
-    } catch (error) {
-      console.error('Error:', error.response?.data || error.message);
+  try {
+    if (!name.trim() || !email.trim() || !symptoms.trim() || prescriptionDetails.length === 0) {
+      alert('Please provide all details.');
+      return;
     }
-  };
+
+    const response = await axios.post(`${process.env.REACT_APP_API_URL}/medicine/add-all-details`, {
+      name,
+      email,
+      symptoms,
+      medicines: prescriptionDetails,
+    });
+console.log("Calling API:", `${process.env.REACT_APP_API_URL}/medicine/add-all-details`);
+
+    if (response.data) {
+      alert('Prescription details saved successfully');
+    }
+  } catch (error) {
+    console.error('Error:', error.response?.data || error.message);
+  }
+};
+
 
   const generateQRCodeImage = async (base64Data) => {
     try {
