@@ -25,13 +25,20 @@ const NewPrescription = () => {
       }
 
       // Save patient and medicine details
-      const response = await axios.post('http://localhost:5000/medicine/add-all-details', {
-        name,
-        email,
-        symptoms,
-        newQuantity,
-        medicines: prescriptionDetails.map(({ medicine, quantity }) => ({ medicine, quantity })),
-      });
+      const response = await axios.post(
+                            `${process.env.REACT_APP_API_URL}/medicine/add-all-details`,
+                            {
+                              name,
+                              email,
+                              symptoms,
+                              newQuantity,
+                              medicines: prescriptionDetails.map(({ medicine, quantity }) => ({
+                                medicine,
+                                quantity
+                              })),
+            }
+        );
+
 
       // Check if response and response.data are defined
       if (response && response.data) {

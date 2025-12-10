@@ -9,7 +9,8 @@ const OldPrescriptions = () => {
   useEffect(() => {
     const fetchOldPrescriptions = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/old-prescriptions');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/old-prescriptions`);
+
         setOldPrescriptions(response.data);
       } catch (error) {
         console.error('Error fetching old prescriptions:', error);
