@@ -39,7 +39,7 @@ const Signup = () => {
 
     const { name, email, password, cpassword } = user;
 
-    const res = await fetch("/register", {
+    const res = await fetch(`${process.env.REACT_APP_API_URL}/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
