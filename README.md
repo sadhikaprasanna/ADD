@@ -1,4 +1,11 @@
 # ADD
+🌐 Live Demo
+
+🚀 Live Application:
+👉 https://addsiterender.onrender.com
+
+The application backend is deployed on Render, providing REST APIs for authentication, prescription management, QR code generation, and email notifications.
+
 💊 Automatic Drug Dispenser System
 
 An Automatic Drug Dispenser is a smart healthcare application designed to automate the medicine dispensing process using QR codes, email notifications, and a full-stack web system integrated with hardware. The system reduces manual errors, pharmacy queue time, and ensures accurate medication delivery to patients.
@@ -20,52 +27,20 @@ Enable secure and contactless medicine delivery
 Digitize healthcare workflows
 
 🛠️ Tech Stack
-Frontend
-
-React.js
-
-HTML, CSS, JavaScript
-
-Bootstrap
-
-Backend
-
-Node.js
-
-Express.js
-
-Database
-
-MongoDB (Atlas)
-
-Hardware
-
-Raspberry Pi
-
-Motor drivers
-
-Sensors for dispensing control
-
-Other Tools & Technologies
-
-QR Code Generation
-
-Email Service (SMTP / Resend)
-
-REST APIs
+Frontend - React.js, HTML, CSS, JavaScript, Bootstrap
+Backend - Node.js, Express.js
+Database - MongoDB (Atlas)
+Hardware - Raspberry Pi, Motor drivers, Sensors for dispensing control
+Other Tools & Technologies - QR Code Generation, Email Service (SMTP / Resend), REST APIs
 
 ⚙️ System Workflow
 
 Doctor logs into the web application
-
 Prescription is created digitally
-
 System generates a QR code for the prescription
-
 QR code is emailed to the patient
-
 Patient scans QR code at the dispenser
-
 Raspberry Pi validates the prescription
-
 Medicines are dispensed automatically
+
+
